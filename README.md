@@ -82,7 +82,9 @@ erDiagram
 
 **Enums:** `user_role` (requester, agent), `ticket_status` (open, in_progress, resolved, closed), `ticket_priority`, `ticket_category`.
 
-Schema and RLS live in `supabase/migrations/001_initial_schema.sql`.
+Schema and RLS live in `supabase/migrations/001_initial_schema.sql`. Migration `002_prevent_role_escalation.sql` adds a trigger so users cannot change their own `role` via the API.
+
+If you already ran `001` before this trigger existed, also run `002` in the Supabase SQL Editor.
 
 ---
 

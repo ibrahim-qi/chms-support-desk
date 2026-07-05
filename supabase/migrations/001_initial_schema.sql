@@ -177,6 +177,23 @@ create policy "Users can update own profile"
   using (id = auth.uid())
   with check (id = auth.uid());
 
+create or replace function public.prevent_profile_role_change()
+returns trigger
+language plpgsql
+as $$
+begin
+  if old.role is distinct from new.role then
+    raise exception 'Role cannot be changed through the application';
+  end if;
+  return new;
+end;
+$$;
+
+create trigger profiles_prevent_role_change
+  before update on public.profiles
+  for each row
+  execute function public.prevent_profile_role_change();
+
 -- tickets
 create policy "Requesters can view own tickets"
   on public.tickets for select
