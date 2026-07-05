@@ -56,8 +56,11 @@ export function AppSidebar({ profile }: { profile: Profile }) {
       <nav className="flex flex-1 flex-col gap-1 p-3">
         {visibleItems.map(({ href, label, icon: Icon }) => {
           const isActive =
-            currentPath === href ||
-            (href !== "/tickets" && currentPath.startsWith(href));
+            href === "/tickets"
+              ? currentPath === "/tickets" ||
+                (currentPath.startsWith("/tickets/") &&
+                  !currentPath.startsWith("/tickets/new"))
+              : currentPath === href || currentPath.startsWith(`${href}/`);
 
           return (
             <Link

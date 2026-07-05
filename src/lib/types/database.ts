@@ -52,6 +52,7 @@ export type Database = {
           full_name?: string;
           role?: UserRole;
         };
+        Relationships: [];
       };
       tickets: {
         Row: Ticket;
@@ -75,6 +76,7 @@ export type Database = {
           priority?: TicketPriority;
           status?: TicketStatus;
         };
+        Relationships: [];
       };
       comments: {
         Row: Comment;
@@ -88,13 +90,17 @@ export type Database = {
         Update: {
           body?: string;
         };
+        Relationships: [];
       };
     };
+    Views: Record<string, never>;
+    Functions: Record<string, never>;
     Enums: {
       user_role: UserRole;
       ticket_status: TicketStatus;
       ticket_priority: TicketPriority;
       ticket_category: TicketCategory;
     };
+    CompositeTypes: Record<string, never>;
   };
 };
