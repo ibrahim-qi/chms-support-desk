@@ -82,9 +82,14 @@ erDiagram
 
 **Enums:** `user_role` (requester, agent), `ticket_status` (open, in_progress, resolved, closed), `ticket_priority`, `ticket_category`.
 
-Schema and RLS live in `supabase/migrations/001_initial_schema.sql`. Migration `002_prevent_role_escalation.sql` adds a trigger so users cannot change their own `role` via the API.
+Schema and RLS live in `supabase/migrations/001_initial_schema.sql`. Additional migrations:
 
-If you already ran `001` before this trigger existed, also run `002` in the Supabase SQL Editor.
+| Migration | Purpose |
+|-----------|---------|
+| `002_prevent_role_escalation.sql` | Blocks users from changing their own `role` (also included in `001` for fresh installs) |
+| `003_restrict_agent_ticket_updates.sql` | DB trigger so agents can only update `status` and `assignee_id` |
+
+If you already ran `001` before these triggers existed, run `002` and `003` in the Supabase SQL Editor.
 
 ---
 
@@ -100,6 +105,8 @@ If you already ran `001` before this trigger existed, also run `002` in the Supa
 ## Authorization and RLS
 
 Security is enforced in **Postgres**, not only in the UI. The anon key is public; RLS runs every query as the signed-in user.
+
+App-layer authorization lives in `src/lib/auth/authorization.ts` — shared helpers for authenticated and agent-only Server Actions and pages. Middleware also redirects non-agents away from `/dashboard`.
 
 ### Helper functions
 
@@ -148,8 +155,9 @@ src/
 ├── components/          UI + feature components
 ├── lib/
 │   ├── supabase/        browser/server clients, middleware helper
-│   ├── auth/            getProfile()
-│   └── tickets/         queries, workflow, constants
+│   ├── auth/            getProfile(), authorization helpers
+│   ├── form.ts          shared FormData parsing and enum guards
+│   └── tickets/         queries, workflow, constants, validation
 └── middleware.ts        session refresh + route protection
 ```
 
@@ -215,7 +223,8 @@ Open http://localhost:3000 — register demo users, promote agent via SQL above.
 |----------|-----------|
 | Server Actions over API routes | Less boilerplate; mutations colocated with the app |
 | RLS as the security boundary | Policies must be correct in SQL; very strong server-side guarantee |
-| Status validation in app layer | Faster to ship; a DB trigger would harden this in production |
+| Agent UPDATE trigger (migration 003) | Restricts DB updates to workflow fields; complements RLS |
+| Status validation in app layer | Faster to ship; DB trigger on transitions would harden further |
 | Priority sort in memory | Fine for small queues; would move to SQL `CASE` at scale |
 | No stretch features | Skipped admin, attachments, audit log, notifications to stay focused |
 

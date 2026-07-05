@@ -1,16 +1,9 @@
-import { redirect } from "next/navigation";
-
 import { StatusCountCards } from "@/components/dashboard/status-count-cards";
-import { getProfile } from "@/lib/auth/get-profile";
+import { requireAgentPageAccess } from "@/lib/auth/authorization";
 import { getTicketCountsByStatus } from "@/lib/tickets/queries";
 
 export default async function DashboardPage() {
-  const profile = await getProfile();
-
-  if (profile?.role !== "agent") {
-    redirect("/tickets");
-  }
-
+  await requireAgentPageAccess();
   const counts = await getTicketCountsByStatus();
 
   return (

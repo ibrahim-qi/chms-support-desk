@@ -5,29 +5,12 @@ import { TicketFilters } from "@/components/tickets/ticket-filters";
 import { TicketTable } from "@/components/tickets/ticket-table";
 import { Button } from "@/components/ui/button";
 import { getProfile } from "@/lib/auth/get-profile";
-import {
-  SORT_OPTIONS,
-  TICKET_STATUSES,
-  type TicketSort,
-} from "@/lib/tickets/constants";
+import { isAgent } from "@/lib/auth/authorization";
 import { getTickets } from "@/lib/tickets/queries";
-import type { TicketStatus } from "@/lib/types/database";
-
-function parseStatus(value?: string): TicketStatus | null {
-  if (!value || value === "all") {
-    return null;
-  }
-
-  return TICKET_STATUSES.includes(value as TicketStatus)
-    ? (value as TicketStatus)
-    : null;
-}
-
-function parseSort(value?: string): TicketSort {
-  return SORT_OPTIONS.some((option) => option.value === value)
-    ? (value as TicketSort)
-    : "created_at";
-}
+import {
+  parseTicketSort,
+  parseTicketStatus,
+} from "@/lib/tickets/validation";
 
 export default async function TicketsPage({
   searchParams,
@@ -36,9 +19,13 @@ export default async function TicketsPage({
 }) {
   const profile = await getProfile();
   const params = await searchParams;
-  const status = parseStatus(params.status);
-  const sort = parseSort(params.sort);
+  const status = parseTicketStatus(params.status);
+  const sort = parseTicketSort(params.sort);
   const tickets = await getTickets({ status, sort });
+
+  if (!profile) {
+    return null;
+  }
 
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
@@ -46,7 +33,7 @@ export default async function TicketsPage({
         <div>
           <h1 className="page-title">Tickets</h1>
           <p className="page-description">
-            {profile?.role === "agent"
+            {isAgent(profile)
               ? "All support tickets across the organisation."
               : "Track the status of tickets you have raised."}
           </p>
@@ -58,7 +45,7 @@ export default async function TicketsPage({
       </div>
 
       <TicketFilters status={status} sort={sort} />
-      <TicketTable tickets={tickets} role={profile!.role} />
+      <TicketTable tickets={tickets} role={profile.role} />
     </div>
   );
 }

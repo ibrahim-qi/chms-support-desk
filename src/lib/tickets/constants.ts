@@ -60,13 +60,6 @@ export const SORT_OPTIONS: { value: TicketSort; label: string }[] = [
   { value: "priority", label: "Priority" },
 ];
 
-export function formatLabel(value: string) {
-  return value
-    .split("_")
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(" ");
-}
-
 export function formatDateTime(value: string) {
   return new Intl.DateTimeFormat("en-GB", {
     dateStyle: "medium",

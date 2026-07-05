@@ -4,7 +4,7 @@ import { ArrowLeft } from "lucide-react";
 
 import { CommentForm } from "@/components/tickets/comment-form";
 import { CommentTimeline } from "@/components/tickets/comment-timeline";
-import { TicketMetaBadges } from "@/components/tickets/ticket-workflow-panel";
+import { TicketMetaBadges } from "@/components/tickets/ticket-meta-badges";
 import { TicketWorkflowPanel } from "@/components/tickets/ticket-workflow-panel";
 import { Button } from "@/components/ui/button";
 import {
@@ -14,6 +14,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { isAgent } from "@/lib/auth/authorization";
 import { getProfile } from "@/lib/auth/get-profile";
 import { CATEGORY_LABELS, formatDateTime } from "@/lib/tickets/constants";
 import {
@@ -32,12 +33,12 @@ export default async function TicketDetailPage({
   const profile = await getProfile();
   const ticket = await getTicketById(id);
 
-  if (!ticket) {
+  if (!ticket || !profile) {
     notFound();
   }
 
   const comments = await getComments(id);
-  const agents = profile?.role === "agent" ? await getAgents() : [];
+  const agents = isAgent(profile) ? await getAgents() : [];
   const nextStatuses = getNextStatuses(ticket.status);
 
   return (
@@ -125,7 +126,7 @@ export default async function TicketDetailPage({
           </Card>
         </div>
 
-        {profile?.role === "agent" && (
+        {isAgent(profile) && (
           <TicketWorkflowPanel
             ticketId={ticket.id}
             currentStatus={ticket.status}

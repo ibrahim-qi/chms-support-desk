@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import type { TicketStatus } from "@/lib/types/database";
 
-import { PRIORITY_ORDER, type TicketSort } from "./constants";
+import { PRIORITY_ORDER, TICKET_STATUSES, type TicketSort } from "./constants";
 import type {
   CommentWithAuthor,
   TicketDetail,
@@ -27,12 +27,7 @@ export async function getTickets(options: {
   }
 
   const sort = options.sort ?? "created_at";
-
-  if (sort === "created_at") {
-    query = query.order("created_at", { ascending: false });
-  } else {
-    query = query.order("created_at", { ascending: false });
-  }
+  query = query.order("created_at", { ascending: false });
 
   const { data, error } = await query;
 
@@ -125,21 +120,30 @@ export async function getAgents() {
 export async function getTicketCountsByStatus() {
   const supabase = await createClient();
 
-  const { data, error } = await supabase.from("tickets").select("status");
-
-  if (error) {
-    throw new Error(error.message);
-  }
-
   const counts = {
     open: 0,
     in_progress: 0,
     resolved: 0,
     closed: 0,
-  };
+  } satisfies Record<TicketStatus, number>;
 
-  for (const row of data ?? []) {
-    counts[row.status]++;
+  const results = await Promise.all(
+    TICKET_STATUSES.map(async (status) => {
+      const { count, error } = await supabase
+        .from("tickets")
+        .select("*", { count: "exact", head: true })
+        .eq("status", status);
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      return { status, count: count ?? 0 };
+    })
+  );
+
+  for (const { status, count } of results) {
+    counts[status] = count;
   }
 
   return counts;

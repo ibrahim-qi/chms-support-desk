@@ -46,5 +46,19 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(redirectUrl);
   }
 
+  if (user && pathname.startsWith("/dashboard")) {
+    const { data: profile, error } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .single();
+
+    if (!error && profile?.role !== "agent") {
+      const redirectUrl = request.nextUrl.clone();
+      redirectUrl.pathname = "/tickets";
+      return NextResponse.redirect(redirectUrl);
+    }
+  }
+
   return supabaseResponse;
 }

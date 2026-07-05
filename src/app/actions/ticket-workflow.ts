@@ -2,19 +2,14 @@
 
 import { revalidatePath } from "next/cache";
 
-import { requireProfile } from "@/lib/auth/get-profile";
-import { TICKET_STATUSES } from "@/lib/tickets/constants";
-import { STATUS_LABELS } from "@/lib/tickets/constants";
+import { getAgentProfile } from "@/lib/auth/authorization";
+import { getField } from "@/lib/form";
+import { TICKET_STATUSES, STATUS_LABELS } from "@/lib/tickets/constants";
 import { getTicketById } from "@/lib/tickets/queries";
 import type { TicketActionState } from "@/lib/tickets/types";
 import { canTransition } from "@/lib/tickets/workflow";
 import { createClient } from "@/lib/supabase/server";
 import type { TicketStatus } from "@/lib/types/database";
-
-function getField(formData: FormData, name: string) {
-  const value = formData.get(name);
-  return typeof value === "string" ? value.trim() : "";
-}
 
 function revalidateTicketPaths(ticketId: string) {
   revalidatePath(`/tickets/${ticketId}`);
@@ -26,10 +21,10 @@ export async function updateTicketStatus(
   _prevState: TicketActionState,
   formData: FormData
 ): Promise<TicketActionState> {
-  const profile = await requireProfile();
+  const auth = await getAgentProfile();
 
-  if (profile.role !== "agent") {
-    return { error: "Only agents can update ticket status.", success: false };
+  if (!auth.ok) {
+    return { error: auth.error, success: false };
   }
 
   const ticketId = getField(formData, "ticketId");
@@ -70,10 +65,10 @@ export async function assignTicket(
   _prevState: TicketActionState,
   formData: FormData
 ): Promise<TicketActionState> {
-  const profile = await requireProfile();
+  const auth = await getAgentProfile();
 
-  if (profile.role !== "agent") {
-    return { error: "Only agents can assign tickets.", success: false };
+  if (!auth.ok) {
+    return { error: auth.error, success: false };
   }
 
   const ticketId = getField(formData, "ticketId");

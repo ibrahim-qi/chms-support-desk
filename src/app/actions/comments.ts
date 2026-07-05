@@ -2,21 +2,22 @@
 
 import { revalidatePath } from "next/cache";
 
-import { requireProfile } from "@/lib/auth/get-profile";
+import { getAuthenticatedProfile } from "@/lib/auth/authorization";
+import { getField } from "@/lib/form";
 import { getTicketById } from "@/lib/tickets/queries";
 import type { TicketActionState } from "@/lib/tickets/types";
 import { createClient } from "@/lib/supabase/server";
-
-function getField(formData: FormData, name: string) {
-  const value = formData.get(name);
-  return typeof value === "string" ? value.trim() : "";
-}
 
 export async function addComment(
   _prevState: TicketActionState,
   formData: FormData
 ): Promise<TicketActionState> {
-  const profile = await requireProfile();
+  const auth = await getAuthenticatedProfile();
+
+  if (!auth.ok) {
+    return { error: auth.error, success: false };
+  }
+
   const ticketId = getField(formData, "ticketId");
   const body = getField(formData, "body");
 
@@ -37,7 +38,7 @@ export async function addComment(
   const supabase = await createClient();
   const { error } = await supabase.from("comments").insert({
     ticket_id: ticketId,
-    author_id: profile.id,
+    author_id: auth.profile.id,
     body,
   });
 

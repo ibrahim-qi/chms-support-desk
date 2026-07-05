@@ -1,24 +1,24 @@
+import { cache } from "react";
+
 import { createClient } from "@/lib/supabase/server";
 import type { Profile } from "@/lib/types/database";
 
-export async function getUser() {
+export const getUser = cache(async () => {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   return user;
-}
+});
 
-export async function getProfile(): Promise<Profile | null> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+export const getProfile = cache(async (): Promise<Profile | null> => {
+  const user = await getUser();
 
   if (!user) {
     return null;
   }
 
+  const supabase = await createClient();
   const { data: profile, error } = await supabase
     .from("profiles")
     .select("*")
@@ -26,18 +26,12 @@ export async function getProfile(): Promise<Profile | null> {
     .single();
 
   if (error) {
-    return null;
+    if (error.code === "PGRST116") {
+      return null;
+    }
+
+    throw new Error(error.message);
   }
 
   return profile;
-}
-
-export async function requireProfile(): Promise<Profile> {
-  const profile = await getProfile();
-
-  if (!profile) {
-    throw new Error("Profile not found");
-  }
-
-  return profile;
-}
+});

@@ -4,12 +4,8 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import type { AuthFormState } from "@/lib/auth/types";
+import { getField } from "@/lib/form";
 import { createClient } from "@/lib/supabase/server";
-
-function getField(formData: FormData, name: string) {
-  const value = formData.get(name);
-  return typeof value === "string" ? value.trim() : "";
-}
 
 export async function signIn(
   _prevState: AuthFormState,

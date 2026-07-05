@@ -4,6 +4,10 @@ import Link from "next/link";
 import { useActionState } from "react";
 
 import { createTicket } from "@/app/actions/tickets";
+import {
+  FormBanner,
+  InlineFieldError,
+} from "@/components/form/form-feedback";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -27,30 +31,6 @@ import {
 } from "@/lib/tickets/types";
 import { cn, fieldSelectClassName } from "@/lib/utils";
 
-function FormError({ message }: { message: string | null }) {
-  if (!message) {
-    return null;
-  }
-
-  return (
-    <p className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-      {message}
-    </p>
-  );
-}
-
-function FieldError({ message, id }: { message?: string; id?: string }) {
-  if (!message) {
-    return null;
-  }
-
-  return (
-    <p id={id} className="text-sm text-destructive">
-      {message}
-    </p>
-  );
-}
-
 export function TicketForm() {
   const [state, formAction, pending] = useActionState<
     TicketFormState,
@@ -70,7 +50,7 @@ export function TicketForm() {
       </CardHeader>
       <form action={formAction} noValidate>
         <CardContent className="grid gap-4">
-          <FormError message={state.error} />
+          <FormBanner message={state.error} />
           <div className="grid gap-2">
             <label htmlFor="title" className="text-sm font-medium">
               Title
@@ -82,7 +62,7 @@ export function TicketForm() {
               aria-invalid={Boolean(fieldErrors.title)}
               aria-describedby={fieldErrors.title ? "title-error" : undefined}
             />
-            <FieldError message={fieldErrors.title} id="title-error" />
+            <InlineFieldError message={fieldErrors.title} id="title-error" />
           </div>
           <div className="grid gap-2">
             <label htmlFor="description" className="text-sm font-medium">
@@ -97,7 +77,10 @@ export function TicketForm() {
                 fieldErrors.description ? "description-error" : undefined
               }
             />
-            <FieldError message={fieldErrors.description} id="description-error" />
+            <InlineFieldError
+              message={fieldErrors.description}
+              id="description-error"
+            />
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="grid gap-2">
@@ -120,7 +103,7 @@ export function TicketForm() {
                   </option>
                 ))}
               </select>
-              <FieldError message={fieldErrors.category} />
+              <InlineFieldError message={fieldErrors.category} />
             </div>
             <div className="grid gap-2">
               <label htmlFor="priority" className="text-sm font-medium">
@@ -142,7 +125,7 @@ export function TicketForm() {
                   </option>
                 ))}
               </select>
-              <FieldError message={fieldErrors.priority} />
+              <InlineFieldError message={fieldErrors.priority} />
             </div>
           </div>
         </CardContent>

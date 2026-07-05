@@ -6,7 +6,7 @@ import {
   assignTicket,
   updateTicketStatus,
 } from "@/app/actions/ticket-workflow";
-import { PriorityBadge } from "@/components/tickets/priority-badge";
+import { ActionFeedback } from "@/components/form/form-feedback";
 import { StatusBadge } from "@/components/tickets/status-badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -23,20 +23,6 @@ import {
 } from "@/lib/tickets/types";
 import type { TicketStatus } from "@/lib/types/database";
 import { fieldSelectClassName } from "@/lib/utils";
-
-function ActionMessage({ state }: { state: TicketActionState }) {
-  if (state.error) {
-    return (
-      <p className="text-sm text-destructive">{state.error}</p>
-    );
-  }
-
-  if (state.success) {
-    return <p className="text-sm text-emerald-600">Updated successfully.</p>;
-  }
-
-  return null;
-}
 
 export function TicketWorkflowPanel({
   ticketId,
@@ -96,7 +82,10 @@ export function TicketWorkflowPanel({
                 ))}
               </select>
             </div>
-            <ActionMessage state={statusState} />
+            <ActionFeedback
+              error={statusState.error}
+              success={statusState.success}
+            />
             <Button type="submit" disabled={statusPending} className="w-fit">
               {statusPending ? "Updating..." : "Update status"}
             </Button>
@@ -127,27 +116,15 @@ export function TicketWorkflowPanel({
               ))}
             </select>
           </div>
-          <ActionMessage state={assignState} />
+          <ActionFeedback
+            error={assignState.error}
+            success={assignState.success}
+          />
           <Button type="submit" disabled={assignPending} className="w-fit">
             {assignPending ? "Saving..." : "Save assignment"}
           </Button>
         </form>
       </CardContent>
     </Card>
-  );
-}
-
-export function TicketMetaBadges({
-  status,
-  priority,
-}: {
-  status: TicketStatus;
-  priority: Parameters<typeof PriorityBadge>[0]["priority"];
-}) {
-  return (
-    <div className="flex flex-wrap gap-2">
-      <StatusBadge status={status} />
-      <PriorityBadge priority={priority} />
-    </div>
   );
 }
