@@ -67,7 +67,14 @@ export function TicketTable({
         <TableBody>
           {tickets.map((ticket) => (
             <TableRow key={ticket.id}>
-              <TableCell className="max-w-xs font-medium">{ticket.title}</TableCell>
+              <TableCell className="max-w-xs font-medium">
+                <Link
+                  href={`/tickets/${ticket.id}`}
+                  className="hover:underline"
+                >
+                  {ticket.title}
+                </Link>
+              </TableCell>
               <TableCell>
                 <StatusBadge status={ticket.status} />
               </TableCell>

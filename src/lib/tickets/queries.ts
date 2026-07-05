@@ -2,7 +2,11 @@ import { createClient } from "@/lib/supabase/server";
 import type { TicketStatus } from "@/lib/types/database";
 
 import { PRIORITY_ORDER, type TicketSort } from "./constants";
-import type { TicketWithRequester } from "./types";
+import type {
+  CommentWithAuthor,
+  TicketDetail,
+  TicketWithRequester,
+} from "./types";
 
 export async function getTickets(options: {
   status?: TicketStatus | null;
@@ -45,4 +49,98 @@ export async function getTickets(options: {
   }
 
   return tickets;
+}
+
+export async function getTicketById(id: string): Promise<TicketDetail | null> {
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from("tickets")
+    .select(
+      `
+      *,
+      requester:profiles!requester_id (
+        id,
+        full_name,
+        email
+      ),
+      assignee:profiles!assignee_id (
+        id,
+        full_name,
+        email
+      )
+    `
+    )
+    .eq("id", id)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return data as TicketDetail | null;
+}
+
+export async function getComments(ticketId: string): Promise<CommentWithAuthor[]> {
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from("comments")
+    .select(
+      `
+      *,
+      author:profiles!author_id (
+        full_name,
+        email,
+        role
+      )
+    `
+    )
+    .eq("ticket_id", ticketId)
+    .order("created_at", { ascending: true });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return (data ?? []) as CommentWithAuthor[];
+}
+
+export async function getAgents() {
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("id, full_name, email")
+    .eq("role", "agent")
+    .order("full_name");
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return data ?? [];
+}
+
+export async function getTicketCountsByStatus() {
+  const supabase = await createClient();
+
+  const { data, error } = await supabase.from("tickets").select("status");
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  const counts = {
+    open: 0,
+    in_progress: 0,
+    resolved: 0,
+    closed: 0,
+  };
+
+  for (const row of data ?? []) {
+    counts[row.status]++;
+  }
+
+  return counts;
 }
