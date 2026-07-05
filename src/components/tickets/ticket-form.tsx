@@ -25,15 +25,9 @@ import {
   ticketFormInitialState,
   type TicketFormState,
 } from "@/lib/tickets/types";
-import { cn } from "@/lib/utils";
+import { cn, fieldSelectClassName } from "@/lib/utils";
 
-const selectClassName = cn(
-  "h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none",
-  "focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50",
-  "dark:bg-input/30"
-);
-
-function FieldError({ message }: { message: string | null }) {
+function FormError({ message }: { message: string | null }) {
   if (!message) {
     return null;
   }
@@ -45,11 +39,25 @@ function FieldError({ message }: { message: string | null }) {
   );
 }
 
+function FieldError({ message, id }: { message?: string; id?: string }) {
+  if (!message) {
+    return null;
+  }
+
+  return (
+    <p id={id} className="text-sm text-destructive">
+      {message}
+    </p>
+  );
+}
+
 export function TicketForm() {
   const [state, formAction, pending] = useActionState<
     TicketFormState,
     FormData
   >(createTicket, ticketFormInitialState);
+
+  const { fieldErrors } = state;
 
   return (
     <Card className="w-full max-w-2xl">
@@ -60,9 +68,9 @@ export function TicketForm() {
           start as Open.
         </CardDescription>
       </CardHeader>
-      <form action={formAction}>
+      <form action={formAction} noValidate>
         <CardContent className="grid gap-4">
-          <FieldError message={state.error} />
+          <FormError message={state.error} />
           <div className="grid gap-2">
             <label htmlFor="title" className="text-sm font-medium">
               Title
@@ -71,8 +79,10 @@ export function TicketForm() {
               id="title"
               name="title"
               placeholder="Brief summary of the issue"
-              required
+              aria-invalid={Boolean(fieldErrors.title)}
+              aria-describedby={fieldErrors.title ? "title-error" : undefined}
             />
+            <FieldError message={fieldErrors.title} id="title-error" />
           </div>
           <div className="grid gap-2">
             <label htmlFor="description" className="text-sm font-medium">
@@ -82,8 +92,12 @@ export function TicketForm() {
               id="description"
               name="description"
               placeholder="What happened? What have you tried?"
-              required
+              aria-invalid={Boolean(fieldErrors.description)}
+              aria-describedby={
+                fieldErrors.description ? "description-error" : undefined
+              }
             />
+            <FieldError message={fieldErrors.description} id="description-error" />
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="grid gap-2">
@@ -93,9 +107,12 @@ export function TicketForm() {
               <select
                 id="category"
                 name="category"
-                required
                 defaultValue="software"
-                className={selectClassName}
+                aria-invalid={Boolean(fieldErrors.category)}
+                className={cn(
+                  fieldSelectClassName,
+                  fieldErrors.category && "border-destructive"
+                )}
               >
                 {TICKET_CATEGORIES.map((value) => (
                   <option key={value} value={value}>
@@ -103,6 +120,7 @@ export function TicketForm() {
                   </option>
                 ))}
               </select>
+              <FieldError message={fieldErrors.category} />
             </div>
             <div className="grid gap-2">
               <label htmlFor="priority" className="text-sm font-medium">
@@ -111,9 +129,12 @@ export function TicketForm() {
               <select
                 id="priority"
                 name="priority"
-                required
                 defaultValue="medium"
-                className={selectClassName}
+                aria-invalid={Boolean(fieldErrors.priority)}
+                className={cn(
+                  fieldSelectClassName,
+                  fieldErrors.priority && "border-destructive"
+                )}
               >
                 {TICKET_PRIORITIES.map((value) => (
                   <option key={value} value={value}>
@@ -121,6 +142,7 @@ export function TicketForm() {
                   </option>
                 ))}
               </select>
+              <FieldError message={fieldErrors.priority} />
             </div>
           </div>
         </CardContent>

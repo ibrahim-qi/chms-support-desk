@@ -44,8 +44,8 @@ export default async function TicketsPage({
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Tickets</h1>
-          <p className="text-sm text-muted-foreground">
+          <h1 className="page-title">Tickets</h1>
+          <p className="page-description">
             {profile?.role === "agent"
               ? "All support tickets across the organisation."
               : "Track the status of tickets you have raised."}

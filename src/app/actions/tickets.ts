@@ -8,7 +8,7 @@ import {
   TICKET_CATEGORIES,
   TICKET_PRIORITIES,
 } from "@/lib/tickets/constants";
-import type { TicketFormState } from "@/lib/tickets/types";
+import type { TicketFieldErrors, TicketFormState } from "@/lib/tickets/types";
 import { createClient } from "@/lib/supabase/server";
 import type { TicketCategory, TicketPriority } from "@/lib/types/database";
 
@@ -36,15 +36,31 @@ export async function createTicket(
   const profile = await requireProfile();
   const title = getField(formData, "title");
   const description = getField(formData, "description");
-  const category = parseCategory(getField(formData, "category"));
-  const priority = parsePriority(getField(formData, "priority"));
+  const categoryValue = getField(formData, "category");
+  const priorityValue = getField(formData, "priority");
+  const category = parseCategory(categoryValue);
+  const priority = parsePriority(priorityValue);
 
-  if (!title || !description) {
-    return { error: "Title and description are required." };
+  const fieldErrors: TicketFieldErrors = {};
+
+  if (!title) {
+    fieldErrors.title = "Title is required.";
   }
 
-  if (!category || !priority) {
-    return { error: "Please select a valid category and priority." };
+  if (!description) {
+    fieldErrors.description = "Description is required.";
+  }
+
+  if (!category) {
+    fieldErrors.category = "Select a valid category.";
+  }
+
+  if (!priority) {
+    fieldErrors.priority = "Select a valid priority.";
+  }
+
+  if (Object.keys(fieldErrors).length > 0) {
+    return { error: null, fieldErrors };
   }
 
   const supabase = await createClient();
@@ -52,12 +68,12 @@ export async function createTicket(
     requester_id: profile.id,
     title,
     description,
-    category,
-    priority,
+    category: category!,
+    priority: priority!,
   });
 
   if (error) {
-    return { error: error.message };
+    return { error: error.message, fieldErrors: {} };
   }
 
   revalidatePath("/tickets");

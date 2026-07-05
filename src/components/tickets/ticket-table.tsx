@@ -52,10 +52,10 @@ export function TicketTable({
   }
 
   return (
-    <Card className="py-0">
+    <Card className="overflow-hidden py-0 ring-1 ring-border/60">
       <Table>
         <TableHeader>
-          <TableRow>
+          <TableRow className="bg-muted/50 hover:bg-muted/50">
             <TableHead>Title</TableHead>
             <TableHead>Status</TableHead>
             <TableHead>Priority</TableHead>

@@ -22,13 +22,7 @@ import {
   type TicketActionState,
 } from "@/lib/tickets/types";
 import type { TicketStatus } from "@/lib/types/database";
-import { cn } from "@/lib/utils";
-
-const selectClassName = cn(
-  "h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none",
-  "focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50",
-  "dark:bg-input/30"
-);
+import { fieldSelectClassName } from "@/lib/utils";
 
 function ActionMessage({ state }: { state: TicketActionState }) {
   if (state.error) {
@@ -93,7 +87,7 @@ export function TicketWorkflowPanel({
                 name="status"
                 required
                 defaultValue={nextStatuses[0]}
-                className={selectClassName}
+                className={fieldSelectClassName}
               >
                 {nextStatuses.map((status) => (
                   <option key={status} value={status}>
@@ -123,7 +117,7 @@ export function TicketWorkflowPanel({
               id="assigneeId"
               name="assigneeId"
               defaultValue={assigneeId ?? ""}
-              className={selectClassName}
+              className={fieldSelectClassName}
             >
               <option value="">Unassigned</option>
               {agents.map((agent) => (

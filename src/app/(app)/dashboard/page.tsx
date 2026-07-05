@@ -16,8 +16,8 @@ export default async function DashboardPage() {
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
-        <p className="text-sm text-muted-foreground">
+        <h1 className="page-title">Dashboard</h1>
+        <p className="page-description">
           Ticket volume by status. Click a card to open the filtered queue.
         </p>
       </div>

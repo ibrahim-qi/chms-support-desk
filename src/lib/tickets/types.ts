@@ -13,8 +13,16 @@ export type CommentWithAuthor = Comment & {
   author: Pick<Profile, "full_name" | "email" | "role"> | null;
 };
 
+export type TicketFieldErrors = {
+  title?: string;
+  description?: string;
+  category?: string;
+  priority?: string;
+};
+
 export type TicketFormState = {
   error: string | null;
+  fieldErrors: TicketFieldErrors;
 };
 
 export type TicketActionState = {
@@ -22,7 +30,10 @@ export type TicketActionState = {
   success: boolean;
 };
 
-export const ticketFormInitialState: TicketFormState = { error: null };
+export const ticketFormInitialState: TicketFormState = {
+  error: null,
+  fieldErrors: {},
+};
 
 export const ticketActionInitialState: TicketActionState = {
   error: null,
