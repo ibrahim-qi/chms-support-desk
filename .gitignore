@@ -44,4 +44,5 @@ next-env.d.ts
 
 # demo prep (local only)
 DEMO.md
+INTERVIEW-PREP.md
 supabase/seed-demo.sql

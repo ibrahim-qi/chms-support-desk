@@ -112,8 +112,9 @@ Apply these in order via the Supabase SQL Editor (`supabase/migrations/`):
 | `001_initial_schema.sql` | Tables, indexes, RLS policies, profile signup trigger |
 | `002_prevent_role_escalation.sql` | Prevents users from changing their own `role` through the API |
 | `003_restrict_agent_ticket_updates.sql` | Restricts agent ticket updates to `status` and `assignee_id` only |
+| `004_fix_role_trigger_for_admin.sql` | Allows agent promotion via SQL Editor while blocking self-service role changes |
 
-If `001` was applied before `002` or `003` existed, run those files separately.
+If `001` was applied before `002`, `003`, or `004` existed, run those files separately.
 
 ---
 
@@ -260,7 +261,9 @@ Open [http://localhost:3000](http://localhost:3000).
 
 ### Test accounts
 
-Register users through the application, then promote an agent in the Supabase SQL Editor:
+Register users through the application, then promote an agent in the Supabase SQL Editor.
+
+If role promotion fails with `Role cannot be changed through the application`, run `004_fix_role_trigger_for_admin.sql` first, then:
 
 ```sql
 update public.profiles
@@ -268,7 +271,7 @@ set role = 'agent'
 where email = 'agent@demo.local';
 ```
 
-Suggested test accounts: `requester@demo.local` (requester) and `agent@demo.local` (agent, after running the SQL above).
+Suggested test accounts: `requester@demo.local` (requester) and `agent@demo.local` (agent, after promotion).
 
 ---
 
@@ -279,7 +282,6 @@ Deploy to [Vercel](https://vercel.com/new) connected to the GitHub repository.
 1. Import the repository
 2. Set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` as environment variables
 3. Deploy
-4. Update the **Live app** link at the top of this document
 
 **Supabase free tier:** Projects pause after approximately seven days of inactivity. If the application fails to load, open the Supabase dashboard or send a request to the deployed URL to wake the project.
 
@@ -318,7 +320,7 @@ Planned improvements for a production deployment:
 | Agent cannot access the dashboard | Confirm `profiles.role = 'agent'` for that user in the SQL Editor |
 | User cannot promote themselves to agent | Expected — migration `002` blocks self-service role changes; update role via SQL Editor or admin process |
 | Application loads slowly or times out | Supabase free-tier project may be paused; open the Supabase dashboard to wake it |
-| RLS errors after initial setup | Ensure migrations `001`, `002`, and `003` have all been applied |
+| RLS errors after initial setup | Ensure migrations `001` through `004` have all been applied |
 | Policies missing in Supabase | Re-run `001_initial_schema.sql` or verify policies under Authentication → Policies |
 
 ---
