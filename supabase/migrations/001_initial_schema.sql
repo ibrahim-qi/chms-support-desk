@@ -183,7 +183,9 @@ language plpgsql
 as $$
 begin
   if old.role is distinct from new.role then
-    raise exception 'Role cannot be changed through the application';
+    if auth.uid() is not null and auth.uid() = old.id then
+      raise exception 'Role cannot be changed through the application';
+    end if;
   end if;
   return new;
 end;

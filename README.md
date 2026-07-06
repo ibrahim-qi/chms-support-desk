@@ -1,28 +1,37 @@
 # CHMS Support Desk
 
-Internal support ticketing application built for the CHMS Cybersec technical exercise. Staff raise tickets; support agents manage them through to resolution.
+An internal support ticketing system for staff to raise IT and operational issues, and for support agents to manage them through to resolution.
 
 | | |
 |---|---|
-| **Live app** | _Add your Vercel URL after deploy_ |
-| **Source** | https://github.com/ibrahim-qi/chms-support-desk |
+| **Live app** | https://chms-support-desk.vercel.app |
+| **Repository** | https://github.com/ibrahim-qi/chms-support-desk |
 
-## Demo accounts
+**Contents:** [Overview](#overview) · [Stack](#stack-and-rationale) · [Data model](#data-model) · [Authentication](#authentication) · [Authorization & RLS](#authorization-and-rls) · [Workflow](#ticket-workflow) · [Project structure](#project-structure) · [Local setup](#local-setup) · [Deployment](#deployment) · [Trade-offs](#key-decisions-and-trade-offs) · [Roadmap](#future-enhancements)
 
-Register these via the app (or use your own test accounts). Set the agent role in Supabase after signup.
+---
 
-| Email | Role | Notes |
-|-------|------|-------|
-| `requester@demo.local` | Requester | Raises and tracks own tickets |
-| `agent@demo.local` | Agent | Run SQL below after registering |
+## Overview
 
-```sql
-update public.profiles
-set role = 'agent'
-where email = 'agent@demo.local';
-```
+CHMS Support Desk is a web application for a small organisation’s internal help desk. Users sign in, raise tickets with a title, description, category, and priority, and track progress. Support agents work from a shared queue, assign tickets, move them through a defined lifecycle, and collaborate via comments.
 
-For local demo, disable **Confirm email** in Supabase → Authentication → Providers → Email.
+### User roles
+
+| Role | Capabilities |
+|------|----------------|
+| **Requester** | Register, sign in, raise tickets, view own tickets, filter and sort the personal queue, add comments on own tickets |
+| **Support agent** | Everything a requester can do, plus: view the full ticket queue, assign tickets, update status, access the status dashboard |
+
+New accounts are created as requesters. Agent access is assigned in the database (see [Test accounts](#test-accounts)).
+
+### Core features
+
+- Email/password authentication (Supabase Auth)
+- Role-based access enforced in Postgres (Row-Level Security)
+- Ticket queue with status filters and sorting
+- Ticket detail with comment timeline
+- Agent workflow: Open → In Progress → Resolved → Closed
+- Agent dashboard with ticket counts by status
 
 ---
 
@@ -30,18 +39,24 @@ For local demo, disable **Confirm email** in Supabase → Authentication → Pro
 
 | Layer | Choice | Why |
 |-------|--------|-----|
-| Framework | Next.js App Router | Server Components for reads, Server Actions for writes, deploys cleanly on Vercel |
-| Database & auth | Supabase (Postgres + Auth) | Managed Postgres with Row-Level Security on the free tier |
-| UI | shadcn/ui + Tailwind | Consistent internal-tool UI without a custom design system |
-| Hosting | Vercel Hobby | Free tier, matches Next.js stack |
+| Framework | Next.js App Router | Server Components for reads, Server Actions for writes; straightforward deployment on Vercel |
+| Database & auth | Supabase (Postgres + Auth) | Managed Postgres with Row-Level Security; auth and database in one service |
+| UI | shadcn/ui + Tailwind CSS | Consistent, accessible internal-tool UI without a custom design system |
+| Hosting | Vercel | Native Next.js support; environment-based configuration |
 
-No ORM, no client data library — the Supabase client plus RLS keeps the data path easy to explain.
+The application uses the Supabase JavaScript client directly — no ORM or client-side data library. Every query carries the signed-in user’s JWT; Row-Level Security in Postgres is the authoritative access-control layer. This keeps the data path simple to audit and maintain.
+
+**Request flow:**
+
+```
+Browser → Server Component / Server Action → Supabase (session cookie) → RLS → Postgres → HTML
+```
 
 ---
 
 ## Data model
 
-Three tables extend Supabase Auth:
+Three application tables extend Supabase Auth. When a user registers, a trigger creates a matching row in `profiles`.
 
 ```mermaid
 erDiagram
@@ -80,52 +95,76 @@ erDiagram
   }
 ```
 
-**Enums:** `user_role` (requester, agent), `ticket_status` (open, in_progress, resolved, closed), `ticket_priority`, `ticket_category`.
+**Design notes:**
 
-Schema and RLS live in `supabase/migrations/001_initial_schema.sql`. Additional migrations:
+- **`profiles`** stores each user’s role (`requester` or `agent`) in Postgres, not only in application code.
+- **`tickets`** holds workflow state with explicit `requester_id` and `assignee_id` foreign keys.
+- **`comments`** are normalised into their own table so the activity timeline scales independently of the ticket record.
 
-| Migration | Purpose |
-|-----------|---------|
-| `002_prevent_role_escalation.sql` | Blocks users from changing their own `role` (also included in `001` for fresh installs) |
-| `003_restrict_agent_ticket_updates.sql` | DB trigger so agents can only update `status` and `assignee_id` |
+**Enums:** `user_role`, `ticket_status` (`open`, `in_progress`, `resolved`, `closed`), `ticket_priority`, `ticket_category`.
 
-If you already ran `001` before these triggers existed, run `002` and `003` in the Supabase SQL Editor.
+### Database migrations
+
+Apply these in order via the Supabase SQL Editor (`supabase/migrations/`):
+
+| File | Purpose |
+|------|---------|
+| `001_initial_schema.sql` | Tables, indexes, RLS policies, profile signup trigger |
+| `002_prevent_role_escalation.sql` | Prevents users from changing their own `role` through the API |
+| `003_restrict_agent_ticket_updates.sql` | Restricts agent ticket updates to `status` and `assignee_id` only |
+
+If `001` was applied before `002` or `003` existed, run those files separately.
 
 ---
 
 ## Authentication
 
-- Email/password via Supabase Auth
-- Session stored in HTTP-only cookies via `@supabase/ssr`
-- `middleware.ts` refreshes the session on each request
-- On signup, a trigger creates a `profiles` row with role `requester`
+- Email and password sign-up and sign-in via Supabase Auth
+- Session stored in HTTP-only cookies using `@supabase/ssr`
+- Middleware refreshes the session on each request and redirects unauthenticated users away from protected routes (`/tickets`, `/dashboard`)
+- On registration, a database trigger creates a `profiles` row with role `requester`
 
 ---
 
 ## Authorization and RLS
 
-Security is enforced in **Postgres**, not only in the UI. The anon key is public; RLS runs every query as the signed-in user.
+The Supabase anon (publishable) key is public by design. **Access control is enforced in Postgres**, not by hiding buttons in the user interface.
 
-App-layer authorization lives in `src/lib/auth/authorization.ts` — shared helpers for authenticated and agent-only Server Actions and pages. Middleware also redirects non-agents away from `/dashboard`.
+Each query runs as the signed-in user. RLS policies determine which rows can be read or written. The application layer adds role checks and business rules (such as valid status transitions); RLS is the security boundary.
 
-### Helper functions
+### Application helpers
 
-- `current_user_role()` — reads role from `profiles`
-- `is_agent()` — true when role is agent
-- `can_view_ticket(ticket_id)` — used by comment policies
+Defined in `src/lib/auth/authorization.ts`:
 
-### Policy summary
+| Helper | Purpose |
+|--------|---------|
+| `getAuthenticatedProfile()` | Validates session for Server Actions available to any signed-in user |
+| `getAgentProfile()` | Validates session and agent role for agent-only mutations |
+| `requireAgentPageAccess()` | Protects the dashboard page |
+| `isAgent()` | Drives role-aware navigation and UI |
 
-| Table | Operation | Who |
-|-------|-----------|-----|
-| `profiles` | SELECT | Own row; agents see all (for assignment dropdown) |
-| `profiles` | UPDATE | Own row only (`full_name`; role is not user-editable) |
-| `tickets` | SELECT | Requester: own tickets; agent: all |
-| `tickets` | INSERT | Authenticated; `requester_id` must equal `auth.uid()` |
-| `tickets` | UPDATE | Agents only |
-| `comments` | SELECT / INSERT | Visible if parent ticket is visible; `author_id = auth.uid()` on insert |
+Middleware redirects non-agents away from `/dashboard`. If a profile lookup fails due to a transient error, the request proceeds and the page-level check applies.
 
-Unauthorized access returns **no rows** — the app shows a generic not-found page rather than leaking whether a ticket ID exists.
+### Postgres helper functions
+
+| Function | Purpose |
+|----------|---------|
+| `current_user_role()` | Returns the signed-in user’s role from `profiles` |
+| `is_agent()` | Used in RLS policies to identify support agents |
+| `can_view_ticket(ticket_id)` | Determines whether the user may access a ticket’s comments |
+
+### RLS policy summary
+
+| Table | Operation | Access |
+|-------|-----------|--------|
+| `profiles` | SELECT | Own profile; agents can read all profiles (for assignment) |
+| `profiles` | UPDATE | Own profile only (`full_name`); role changes blocked by trigger |
+| `tickets` | SELECT | Requesters: own tickets; agents: all tickets |
+| `tickets` | INSERT | Authenticated users; `requester_id` must equal the signed-in user |
+| `tickets` | UPDATE | Agents only; database trigger limits updatable columns |
+| `comments` | SELECT / INSERT | Parent ticket must be visible to the user; author must be the signed-in user |
+
+When a user requests a ticket they cannot access, RLS returns no rows. The application responds with a generic **not-found** page rather than an explicit “access denied”, so ticket IDs are not leaked to unauthorised users.
 
 ---
 
@@ -135,37 +174,47 @@ Unauthorized access returns **no rows** — the app shows a generic not-found pa
 Open → In Progress → Resolved → Closed
 ```
 
-- New tickets default to **Open**
-- Only **agents** can change status or assign an ticket
-- Valid transitions are checked in `src/lib/tickets/workflow.ts` and in Server Actions
-- Requesters can view their tickets and add comments
+| Rule | Enforced by |
+|------|-------------|
+| New tickets default to **Open** | Database default |
+| Only agents may change status or assign tickets | RLS + Server Actions |
+| Transitions are forward-only (no skipping or reversing) | `src/lib/tickets/workflow.ts` + Server Actions |
+| Requesters may view their tickets and add comments | RLS policies |
+
+On the ticket detail page, agents see a workflow panel for status and assignment. Requesters see ticket details and the comment timeline only.
 
 ---
 
-## Application structure
+## Project structure
 
 ```
 src/
 ├── app/
-│   ├── (auth)/          login, register
-│   ├── (app)/           sidebar layout
-│   │   ├── tickets/     queue, new, detail
-│   │   └── dashboard/   agent status counts
-│   └── actions/         Server Actions (auth, tickets, comments)
-├── components/          UI + feature components
+│   ├── (auth)/          Login and registration
+│   ├── (app)/           Authenticated shell: dashboard, ticket queue, detail
+│   └── actions/         Server Actions (auth, tickets, workflow, comments)
+├── components/          Layout, ticket UI, shared form feedback, shadcn/ui
 ├── lib/
-│   ├── supabase/        browser/server clients, middleware helper
-│   ├── auth/            getProfile(), authorization helpers
-│   ├── form.ts          shared FormData parsing and enum guards
-│   └── tickets/         queries, workflow, constants, validation
-└── middleware.ts        session refresh + route protection
+│   ├── supabase/        Browser/server clients, middleware session helper
+│   ├── auth/            Profile loading (cached per request), authorization
+│   ├── form.ts          Shared FormData parsing and enum validation
+│   └── tickets/         Queries, workflow rules, constants, validation
+└── middleware.ts        Session refresh and route protection
 ```
 
-**Request flow:** Browser → Server Component or Server Action → Supabase (JWT in cookie) → RLS-filtered Postgres → HTML response.
+- **Reads:** Server Components calling `src/lib/tickets/queries.ts`
+- **Writes:** Server Actions in `src/app/actions/`
+- **Business rules:** `src/lib/tickets/workflow.ts`
 
 ---
 
 ## Local setup
+
+### Prerequisites
+
+- Node.js 20 or later
+- npm
+- A Supabase project ([supabase.com](https://supabase.com))
 
 ### 1. Clone and install
 
@@ -177,69 +226,103 @@ npm install
 
 ### 2. Environment variables
 
-Copy `.env.local.example` to `.env.local`:
+Copy `.env.local.example` to `.env.local` and set:
 
-```env
-NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
-NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=your-publishable-or-anon-key
-```
+| Variable | Description |
+|----------|-------------|
+| `NEXT_PUBLIC_SUPABASE_URL` | Project URL from Supabase → Settings → API |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Publishable (anon) key from the same page |
 
 ### 3. Database
 
-In the Supabase SQL Editor, run the full contents of:
-
-```
-supabase/migrations/001_initial_schema.sql
-```
+Run the migration files in the Supabase SQL Editor (see [Database migrations](#database-migrations)).
 
 ### 4. Auth settings
 
-In Supabase Dashboard → Authentication → Providers → Email, disable **Confirm email** for frictionless local/demo signup.
+In Supabase → Authentication → Providers → Email, disable **Confirm email** if you want immediate sign-in after registration (recommended for development and staging).
 
-### 5. Run
+### 5. Run the application
 
 ```bash
 npm run dev
 ```
 
-Open http://localhost:3000 — register demo users, promote agent via SQL above.
+Open [http://localhost:3000](http://localhost:3000).
+
+### npm scripts
+
+| Command | Description |
+|---------|-------------|
+| `npm run dev` | Start the development server |
+| `npm run build` | Production build |
+| `npm run start` | Run the production build locally |
+| `npm run lint` | Run ESLint |
+
+### Test accounts
+
+Register users through the application, then promote an agent in the Supabase SQL Editor:
+
+```sql
+update public.profiles
+set role = 'agent'
+where email = 'agent@demo.local';
+```
+
+Suggested test accounts: `requester@demo.local` (requester) and `agent@demo.local` (agent, after running the SQL above).
 
 ---
 
-## Deployment (Vercel)
+## Deployment
 
-1. Push the repo to GitHub
-2. Import the project at [vercel.com/new](https://vercel.com/new)
-3. Add the same two environment variables as `.env.local`
-4. Deploy
+Deploy to [Vercel](https://vercel.com/new) connected to the GitHub repository.
 
-**Before your demo:** Supabase free projects pause after ~7 days of inactivity. Open the live app shortly before the interview so the project is awake.
+1. Import the repository
+2. Set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` as environment variables
+3. Deploy
+4. Update the **Live app** link at the top of this document
+
+**Supabase free tier:** Projects pause after approximately seven days of inactivity. If the application fails to load, open the Supabase dashboard or send a request to the deployed URL to wake the project.
 
 ---
 
 ## Key decisions and trade-offs
 
-| Decision | Trade-off |
-|----------|-----------|
-| Server Actions over API routes | Less boilerplate; mutations colocated with the app |
-| RLS as the security boundary | Policies must be correct in SQL; very strong server-side guarantee |
-| Agent UPDATE trigger (migration 003) | Restricts DB updates to workflow fields; complements RLS |
-| Status validation in app layer | Faster to ship; DB trigger on transitions would harden further |
-| Priority sort in memory | Fine for small queues; would move to SQL `CASE` at scale |
-| No stretch features | Skipped admin, attachments, audit log, notifications to stay focused |
+| Decision | Rationale | Trade-off |
+|----------|-----------|-----------|
+| Server Actions over REST API routes | Less boilerplate; mutations live alongside the UI for a focused internal tool | A public REST API would require a separate layer |
+| RLS as the security boundary | Enforced on every query, including direct database API access | Policies must be maintained carefully in SQL |
+| Agent UPDATE trigger (migration 003) | Prevents agents from rewriting ticket content via the database API | Status transition rules are still validated in application code |
+| Status transitions in application code | Centralised, easy to read and change in one TypeScript module | Direct API calls could bypass transition rules until a database trigger is added |
+| Priority sort in application memory | Acceptable for small ticket volumes | At scale, use SQL ordering and pagination |
+| Status sort via dropdown | Clear, accessible filtering without custom table behaviour | Differs from sortable column headers in some enterprise tools |
 
 ---
 
-## If I had more time
+## Future enhancements
 
-- Audit log table for status and assignment changes
-- DB trigger to enforce workflow transitions
-- Pagination on the ticket queue
-- Email notifications on assignment
-- Regenerate TypeScript types from Supabase CLI
+Planned improvements for a production deployment:
+
+- Audit log for status changes and assignments
+- Database trigger to enforce workflow transitions
+- Pagination and search on the ticket queue
+- Email notifications when a ticket is assigned
+- TypeScript types generated from the Supabase schema (`supabase gen types`)
+
+---
+
+## Troubleshooting
+
+| Issue | Resolution |
+|-------|------------|
+| Sign-up succeeds but sign-in fails | Disable **Confirm email** in Supabase Auth settings, or confirm the address via email |
+| Agent cannot access the dashboard | Confirm `profiles.role = 'agent'` for that user in the SQL Editor |
+| User cannot promote themselves to agent | Expected — migration `002` blocks self-service role changes; update role via SQL Editor or admin process |
+| Application loads slowly or times out | Supabase free-tier project may be paused; open the Supabase dashboard to wake it |
+| RLS errors after initial setup | Ensure migrations `001`, `002`, and `003` have all been applied |
+| Policies missing in Supabase | Re-run `001_initial_schema.sql` or verify policies under Authentication → Policies |
 
 ---
 
 ## License
 
-Built as an original technical exercise submission for CHMS Cybersec. Not derived from any open-source help-desk system.
+Copyright © 2026. All rights reserved.
